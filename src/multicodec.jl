@@ -96,6 +96,16 @@ for (idx, name) in enumerate(select(multicodecTable, "name").name)
 		getCodecDescription(a::Type{$structName}) = $description
 		getCodecDescription(a::Val{Symbol($mName)}) = getCodecDescription(getCodec(a))
 		getCodecDescription(a::Val{$code}) = getCodecDescription(getCodec(a))
+
+		# TODO
+		Base.show(a::$structName) = begin
+			"Codec : $structName $(getCodecStatus(a)), $(getCodecCode(a))"
+		end		
+
+		# TODO
+		Base.display(a::$structName) = begin
+			"Codec : $structName $(getCodecStatus(a)), $(getCodecCode(a))"
+		end	
 	end |> eval
 end
 
@@ -114,4 +124,31 @@ codecStatus(id::Unsigned) = getCodecStatus(Val(id))
 codecDescription(name::Symbol) = getCodecDescription(Val(name))
 codecDescription(ud::Unsigned) = getCodecDescription(Val(id))
 
-export codec, codecName, codecSymbol, codecCode, codecTag, codecStatus, codecDescription
+# TODO
+function encode(::Type{CodecType}, bytes::Vector{UInt8}) where CodecType<:AbstractMultiCodec
+	pushfirst!(codecCode(CodecType), bytes)
+end
+
+# TODO
+function decode(::Type{CodecType}, bytes::Vector{UInt8}) where CodecType<:AbstractMultiCodec
+	popfirst!(codecCode(CodecType), bytes)
+end
+
+function encode(symbol::Symbol, bytes::Vector{UInt8})
+	code = reinterpret(UInt8, [codecCode(symbol)]) |> reverse
+	pushfirst!(bytes, code...)
+end
+
+function decode(symbol::Symbol, bytes::Vector{UInt8})
+	code = reinterpret(UInt8, [codecCode(symbol)]) |> reverse
+	@assert code == bytes[1:length(code)] "Given bytes doesnot match encoding $symbol"
+	for i in code
+		r = popfirst!(bytes)
+		@assert r == i "Removed bytes content!!!"
+	end
+	bytes
+end
+
+export codec, codecName, codecSymbol, codecCode, 
+	codecTag, codecStatus, codecDescription,
+	encode, decode
