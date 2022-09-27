@@ -211,14 +211,6 @@ function multiEncode(symbol::Symbol, bytes::Vector{UInt8})
 		for (idx, byte) in enumerate(byteArray)
 			word += ((byte |> UInt32) << (8*(idx-1)))
 		end
-		# word = reinterpret(
-			# UInt32,
-			# push!(
-				# UInt8[],
-				# (byteArray)...,
-				# zeros(UInt8, 4 - length(byteArray))...,
-			# )
-		# ) |> collect |> (x) -> getindex(x, 1)
 		for segment in 1:4
 			encodedArray[(idx-1)*4 + segment] = encoder[(word&mask) |> UInt8]
 			word >>= 6
