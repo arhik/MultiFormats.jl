@@ -19,7 +19,7 @@ end |> eval
 
 
 # Protocol Size
-protocolSizeList = select(multiprotocolTable, "size").size .|> (x) -> "Protocol"*x
+protocolSizeList = select(multiprotocolTable, "size").size .|> (x) -> "Protocol_"*x
 
 quote
 	@enum AddrSize $(
@@ -48,6 +48,12 @@ for (idx, name) in enumerate(select(multiprotocolTable, "name").name)
 	size = protocolSizeList[idx] .|> uppercase .|> Symbol
 	
 	mName = replace(name, "-" => "_")
+
+	# TODO 421 code repeats and is in fovor of p2p over ipfs
+	# we need to handle this for backcompatibility
+	if name == "ipfs"
+		continue
+	end
 
 	quote 
 		struct $structName <: AbstractMultiAddr
