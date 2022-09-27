@@ -206,6 +206,7 @@ function multiEncode(symbol::Symbol, bytes::Vector{UInt8})
 	# TODO we will have to fill with pad values based on encoder
 	encodedArray = zeros(UInt8, div(div(length(bytes)*4, 3, RoundUp), 4, RoundUp)*4 |> Int)
 	mask = 0x3f |> UInt32
+	# TODO Threads.@spawn for benchmarking
 	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 3))
 		word = zero(UInt32)
 		for (idx, byte) in enumerate(byteArray)
@@ -224,6 +225,7 @@ function multiDecode(symbol::Symbol, bytes::Vector{UInt8})
 	# TODO 
 	decodedArray = zeros(UInt8, div(div(length(bytes)*3, 4, RoundUp), 3, RoundUp)*3 |> Int)
 	mask = 0xff |> UInt32
+	# TODO Threads.@spawn 
 	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 4))
 		word = zero(UInt32)
 		for (idx, byte) in enumerate(byteArray)

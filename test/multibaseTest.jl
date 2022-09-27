@@ -1,6 +1,6 @@
 using MultiFormats
 
-inputString = "lffsdasdf work."
+inputString = "Hello world! I am here. Did I reach there."
 
 io = IOBuffer()
 write(io, inputString)
@@ -16,4 +16,7 @@ decbytes = MultiFormats.multiDecode(:base64, encbytes)
 
 outputString = decbytes .|> Char |> String
 
-inputString == strip(outputString, '\0')
+@testset "Encode and decode match" begin
+	@test inputString == strip(outputString, '\0')
+end
+
