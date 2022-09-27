@@ -19,7 +19,7 @@ end |> eval
 
 
 # Base Status
-baseStatusList = select(multibaseTable, "status").status .|> (x) -> "Base"*x
+baseStatusList = select(multibaseTable, "status").status .|> (x) -> "Base_"*x
 
 quote
 	@enum BaseStatus $(
@@ -47,7 +47,10 @@ baseDescriptions = select(multibaseTable, "description").description
 
 abstract type AbstractMultiBase end
 
-for (idx, name) in enumerate(select(multibaseTable, "encoding").encoding)
+encodingNames = select(multibaseTable, "encoding").encoding
+encodingSymbols = encodingNames .|> (x)->replace(x, "-"=>"_") .|> Symbol
+
+for (idx, name) in enumerate(encodingNames)
 	sName = "Base-"*name
 	structName = join(split(sName, "-") |> (x) -> map(uppercasefirst, x)) |> Symbol
 
@@ -124,22 +127,138 @@ baseStatus(id::Union{Unsigned, Char}) = getBaseStatus(Val(id))
 baseDescription(name::Symbol) = getBaseDescription(Val(name))
 baseDescription(ud::Union{Unsigned, Char}) = getBaseDescription(Val(id))
 
-# TODO
-function encodebase(::Type{BaseType}, bytes::Vector{UInt8}) where BaseType<:AbstractMultiBase
+
+# TODO list is right now just a place holder like emoji needs work
+encodeString(a::Val{:base2}) = "01"
+encodeString(a::Val{:base8}) = "01234567"
+encodeString(a::Val{:base10}) = "0123456789"
+encodeString(a::Val{:base16}) = "0123456789abcdef"
+encodeString(a::Val{:base16upper}) = "0123456789ABCDEF"
+encodeString(a::Val{:base32hex}) = "0123456789abcdefghijklmnopqrstuv"
+encodeString(a::Val{:base32hexupper}) = "0123456789ABCDEFGHIJKLMNOPQRSTUV"
+encodeString(a::Val{:base32hexpad}) = "0123456789abcdefghijklmnopqrstuv="
+encodeString(a::Val{:base32hexpadupper}) = "0123456789ABCDEFGHIJKLMNOPQRSTUV="
+encodeString(a::Val{:base32}) = "abcdefghijklmnopqrstuvwxyz234567"
+encodeString(a::Val{:base32pad}) = "abcdefghijklmnopqrstuvwxyz234567="
+encodeString(a::Val{:base32upper}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+encodeString(a::Val{:base32padupper}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567="
+encodeString(a::Val{:base32z}) = "ybndrfg8ejkmcpqxot1uwisza345h769"
+encodeString(a::Val{:base36}) = "0123456789abcdefghijklmnopqrstuvwxyz"
+encodeString(a::Val{:base36upper}) = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+encodeString(a::Val{:base58flickr}) = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+encodeString(a::Val{:base58btc}) = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+encodeString(a::Val{:base64}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+encodeString(a::Val{:base64pad}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+encodeString(a::Val{:base64url}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+encodeString(a::Val{:base64urlpad}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
+encodeString(a::Val{:proquint}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
+encodeString(a::Val{:base256emoji}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
+
+# symbol to val dispatch
+encodeString(a::Symbol) = encodeString(Val(a))
+
+
+# TODO not used can be removed maybe
+function buildEncodingTable(baseEnc::Symbol)
+	encodeDict = Dict{UInt8, UInt8}()
+	decodeDict = Dict{UInt8, UInt8}()
+	encString = encodeString(baseEnc)
+	for (idx, char) in enumerate(encString)
+		encodeDict[UInt8(idx-1)] = UInt8(char)
+		decodeDict[UInt8(char)] = UInt8(idx-1) 
+	end
+	return (encodeDict, decodeDict)
+end
+
+
+for enc in encodingSymbols
+	# TODO skipping identity for now
+	if enc == :identity
+		continue
+	end
+	encName = Symbol(enc, :Enc, :Dict)
+	decName = Symbol(enc, :Dec, :Dict)
+	encString = encodeString(enc)
+	quote
+		$encName = Dict{UInt8, UInt8}()
+		$decName = Dict{UInt8, UInt8}()
+		for (idx, char) in enumerate($encString)
+			$encName[UInt8(idx-1)] = UInt8(char)
+			$decName[UInt8(char)] = UInt8(idx-1)
+		end
+	end |> eval
+
+end
+
+
+# TODO not used
+function multiEncode(::Type{BaseType}, bytes::Vector{UInt8}) where BaseType<:AbstractMultiBase
 	pushfirst!(baseCode(BaseType), bytes)
 end
 
-# TODO
-function decodebase(::Type{BaseType}, bytes::Vector{UInt8}) where BaseType<:AbstractMultiBase
+# TODO not used
+function multiDecode(::Type{BaseType}, bytes::Vector{UInt8}) where BaseType<:AbstractMultiBase
 	popfirst!(baseCode(BaseType), bytes)
 end
 
-function encodebase(symbol::Symbol, bytes::Vector{UInt8})
+function multiEncode(symbol::Symbol, bytes::Vector{UInt8})
+	encoder = Symbol(symbol, :Enc, :Dict) |> eval
+	# TODO we will have to fill with pad values based on encoder
+	encodedArray = zeros(UInt8, div(div(length(bytes)*4, 3, RoundUp), 4, RoundUp)*4 |> Int)
+	mask = 0x3f |> UInt32
+	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 3))
+		word = zero(UInt32)
+		for (idx, byte) in enumerate(byteArray)
+			word += ((byte |> UInt32) << (8*(idx-1)))
+		end
+		# word = reinterpret(
+			# UInt32,
+			# push!(
+				# UInt8[],
+				# (byteArray)...,
+				# zeros(UInt8, 4 - length(byteArray))...,
+			# )
+		# ) |> collect |> (x) -> getindex(x, 1)
+		for segment in 1:4
+			encodedArray[(idx-1)*4 + segment] = encoder[(word&mask) |> UInt8]
+			word >>= 6
+		end
+	end
+	return encodedArray
+end
+
+function multiDecode(symbol::Symbol, bytes::Vector{UInt8})
+	decoder = Symbol(symbol, :Dec, :Dict) |> eval
+	# we should probably fill with pad values based encoder
+	decodedArray = zeros(UInt8, div(div(length(bytes)*3, 4, RoundUp), 3, RoundUp)*3 |> Int)
+	mask = 0xff |> UInt32
+	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 4))
+		word = zero(UInt32)
+		for (idx, byte) in enumerate(byteArray)
+			word += ((byte |> UInt32) << (6*(idx - 1)))
+		end
+		# word = reinterpret(
+			# UInt32,
+			# push!(
+				# UInt8[],
+				# (byteArray)...,
+				# zeros(UInt8, 4 - length(byteArray))...,
+			# )
+		# ) |> collect |> (x) -> getindex(x, 1)
+		for segment in 1:3
+			decodedArray[(idx-1)*3 + segment] = decoder[(word&mask) |> UInt8]
+			word >>= 8
+		end
+	end
+	return decodedArray
+end
+
+function multiWrap(symbol::Symbol, bytes::Vector{UInt8})
 	code = reinterpret(UInt8, [baseCode(symbol)]) |> reverse
 	pushfirst!(bytes, code...)
 end
 
-function decodebase(symbol::Symbol, bytes::Vector{UInt8})
+function multiUnwrap(symbol::Symbol, bytes::Vector{UInt8})
 	code = reinterpret(UInt8, [baseCode(symbol)]) |> reverse
 	@assert code == bytes[1:length(code)] "Given bytes doesnot match encoding $symbol"
 	for i in code
@@ -151,5 +270,4 @@ end
 
 export base, baseName, baseSymbol, baseCode, 
 	baseStatus, baseDescription,
-	encodebase, decodebase
-
+	multiEncode, multiDecode
