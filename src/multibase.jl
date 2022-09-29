@@ -1,9 +1,10 @@
 using CSV
 using DataFrames
 using Base64
+using Downloads
 
 # TODO artifact or a permanent location
-basetable = download("https://raw.githubusercontent.com/multiformats/multibase/master/multibase.csv")
+basetable = Downloads.download("https://raw.githubusercontent.com/multiformats/multibase/master/multibase.csv")
 
 multibaseTable = CSV.read(open(basetable), DataFrame, stripwhitespace=true)
 
@@ -160,11 +161,32 @@ encodeString(a::Val{:base64url}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr
 encodeString(a::Val{:base64urlpad}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
 encodeString(a::Val{:proquint}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
 encodeString(a::Val{:base256emoji}) = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
-
 encodeString(a::Symbol) = encodeString(Val(a))
 
-encode(symbol::Symbol, x::UInt8) = encode(Val(symbol), x::UInt8)
-encode(::Val{:base64}, x::UInt8) = encodeString(:base64)[(x&0x3f) + 1]
+
+for enc in encodingSymbols
+	if enc == :identity
+		continue
+	end
+	encName = Symbol(enc, :Enc, :Dict)
+	decName = Symbol(enc, :Dec, :Dict)
+	encString = encodeString(enc)
+	quote
+		$encName = Dict{UInt8, UInt8}()
+		$decName = Dict{UInt8, UInt8}()
+		for (idx, char) in enumerate($encString)
+			$encName[UInt8(idx-1)] = UInt8(char)
+			$decName[UInt8(char)] = UInt8(idx-1)
+		end
+	end |> eval
+end
+
+
+encode(symbol::Symbol, x::UInt8) = @inline encode(Val(symbol), x::UInt8)
+encode(::Val{:base64}, x::UInt8) = @inline base64EncDict[(x&0x3f)]
+
+decode(symbol::Symbol, x::UInt8) = @inline decode(Val(symbol), x::UInt8)
+decode(::Val{:base64}, x::UInt8) = @inline @inbounds base64DecDict[x]
 
 
 function multiEncode(::Type{BaseType}, bytes::Vector{UInt8}) where BaseType<:AbstractMultiBase
@@ -177,52 +199,87 @@ function multiDecode(::Type{BaseType}, bytes::Vector{UInt8}) where BaseType<:Abs
 end
 
 
-function multiEncode(enc::Val{:base64}, bytes::Vector{UInt8})
-	encodedArray = IOBuffer()
-	pad = '=' |> UInt8
-	padCount = 0
-	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 3))
-		padCount = 3 - length(byteArray)
-		word = zero(UInt32)
- 		for (idx, byte) in enumerate(byteArray)
-			word += ((byte |> UInt32) << (8*(4 - idx)))
+function multiEncode(enc::Val{:base64}, ioBuffer::IOBuffer, ptr::Ptr{UInt8}, n::UInt)::UInt
+	pad = '='
+	nWrites = 0
+	bufSize = 512
+	inSize = div(div(bufSize*3, 4, RoundUp), 3, RoundUp)*3 |> Int
+	buffer = Vector{UInt8}(undef, bufSize)
+	bytes = unsafe_wrap(Vector{UInt8}, ptr, n)
+	padCount = Ref(0)
+	for bufRange in Base.Iterators.partition(1:n, inSize)
+		for (pIdx, ptrRange) in enumerate(Base.Iterators.partition(bufRange, 3))
+			padCount[] = 3 - length(ptrRange)
+			word = zero(UInt32)
+	 		for (idx, ptrIdx) in enumerate(ptrRange)
+				word += ((bytes[ptrIdx] |> UInt32) << (8*(4 - idx)))
+			end
+			for segment in 1:(4-padCount[])
+				buffer[(pIdx-1)*4 + segment] = encode(Val(:base64), ((word) >> 26) |> UInt8)
+				word <<= 6
+			end
+			for segment in 1:padCount[]
+				buffer[(pIdx-1)*4 + length(ptrRange) + segment + 1] = pad
+			end
+			nWrites+=(3-padCount[])
 		end
-		for segment in 1:(4-padCount)
-			write(encodedArray, encode(enc, ((word) >> 26) |> UInt8))
-			word <<= 6
-		end
-		for segment in 1:padCount
-			write(encodedArray, pad)
-		end
+		write(ioBuffer, 
+			unsafe_wrap(
+				Vector{UInt8}, 
+				pointer(buffer), 
+				(div(div(length(bufRange)*4, 3, RoundUp), 4, RoundUp)*4 |> Int)
+			)
+		)
 	end
-	s = String(take!(encodedArray))
-	close(encodedArray)
-	return s
+	return nWrites
 end
 
+function multiEncode(enc::Val{:base64}, bytes::Union{String, Vector{UInt8}})
+	io = IOBuffer()
+	multiEncode(enc, io, pointer(bytes), length(bytes) |> UInt)
+	return String(take!(io))
+	# encodedArray = IOBuffer()
+	# pad = '=' |> UInt8
+	# padCount = 0
+	# for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 3))
+		# padCount = 3 - length(byteArray)
+		# word = zero(UInt32)
+ 		# for (idx, byte) in enumerate(byteArray)
+			# word += ((byte |> UInt32) << (8*(4 - idx)))
+		# end
+		# for segment in 1:(4-padCount)
+			# write(encodedArray, encode(enc, ((word) >> 26) |> UInt8))
+			# word <<= 6
+		# end
+		# for segment in 1:padCount
+			# write(encodedArray, pad)
+		# end
+	# end
+	# s = String(take!(encodedArray))
+	# close(encodedArray)
+	# return s
+end
 
 # TODO combine them if there are no edge cases
-function multiEncode(enc::Val{:base64}, text::String)
-	encodedArray = IOBuffer()
+function multiDecode(enc::Val{:base64}, bytes::Vector{UInt8})
+	decodedArray = IOBuffer()
 	pad = '=' |> UInt8
 	padCount = 0
-	for (idx, byteArray) in enumerate(Base.Iterators.partition(text, 3))
-		padCount = 3 - length(byteArray)
+	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 4))
+		padCount = 4 - length(byteArray)
 		word = zero(UInt32)
  		for (idx, byte) in enumerate(byteArray)
-			word += ((byte |> UInt32) << (8*(4 - idx)))
+ 			if byte == pad
+ 				padCount += 1
+ 			end
+			word += ((decode(enc, byte) |> UInt32) << (6*(5 - idx) + 2))
 		end
-		for segment in 1:(4-padCount)
-			write(encodedArray, encode(enc, ((word) >> 26) |> UInt8))
-			word <<= 6
-		end
-		for segment in 1:padCount
-			write(encodedArray, pad)
+		for segment in 1:(3-padCount)
+			write(decodedArray, (word >> 24) |> UInt8)
+			word <<= 8
 		end
 	end
-	s = String(take!(encodedArray))
-	close(encodedArray)
-	return s
+	take!(decodedArray)
 end
 
 
@@ -230,27 +287,16 @@ function multiEncode(symbol::Symbol, bytes::Vector{UInt8})
 	multiEncode(Val(symbol), bytes)
 end
 
-
 function multiEncode(symbol::Symbol, text::String)
 	multiEncode(Val(symbol), text)
 end
 
-
 function multiDecode(symbol::Symbol, bytes::Vector{UInt8})
-	decoder = Symbol(symbol, :Dec, :Dict) |> eval
-	decodedArray = zeros(UInt8, div(div(length(bytes)*3, 4, RoundUp), 3, RoundUp)*3 |> Int)
-	mask = 0xff |> UInt32
-	for (idx, byteArray) in enumerate(Base.Iterators.partition(bytes, 4))
-		word = zero(UInt32)
-		for (idx, byte) in enumerate(byteArray)
-			word += ((decoder[(byte&mask)] |> UInt32) << (6*(idx - 1)))
-		end
-		for segment in 1:3
-			decodedArray[(idx-1)*3 + segment] = ((word&mask) |> UInt8)
-			word >>= 8
-		end
-	end
-	return decodedArray
+	multiDecode(Val(symbol), bytes)
+end
+
+function multiDecode(symbol::Symbol, text::String)
+	multiDecode(Val(symbol), text)
 end
 
 
