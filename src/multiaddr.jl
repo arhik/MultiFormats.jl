@@ -1,8 +1,9 @@
 using CSV
 using DataFrames
+using Downloads
 
 # TODO artifact or a permanent location
-protocoltable = download("https://raw.githubusercontent.com/multiformats/multiaddr/master/protocols.csv")
+protocoltable = Downloads.download("https://raw.githubusercontent.com/multiformats/multiaddr/master/protocols.csv")
 
 multiprotocolTable = CSV.read(open(protocoltable), DataFrame, stripwhitespace=true)
 
