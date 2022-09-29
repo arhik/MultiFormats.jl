@@ -1,5 +1,3 @@
-io = IOBuffer()
-
 
 mutable struct Buffer <: IO
     data::Vector{UInt8}
@@ -89,10 +87,12 @@ function Base.unsafe_write(pipe::Base64EncodePipe, ptr::Ptr{UInt8}, n::UInt)::UI
 			end
 			nWrites+=(3-padCount[])
 		end
-		write(ioBuffer, unsafe_wrap(
-			Vector{UInt8}, 
-			pointer(buffer), 
-			(div(div(length(bufRange)*4, 3, RoundUp), 4, RoundUp)*4 |> Int))
+		write(ioBuffer, 
+			unsafe_wrap(
+				Vector{UInt8}, 
+				pointer(buffer), 
+				(div(div(length(bufRange)*4, 3, RoundUp), 4, RoundUp)*4 |> Int)
+			)
 		)
 	end
 	return nWrites

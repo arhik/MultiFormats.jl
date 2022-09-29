@@ -1,5 +1,3 @@
-io = IOBuffer()
-
 
 mutable struct Buffer <: IO
     data::Vector{UInt8}
