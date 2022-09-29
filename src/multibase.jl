@@ -287,7 +287,6 @@ function multiDecode(enc::Val{:base64}, ioBuffer::IOBuffer, ptr::Ptr{UInt8}, n::
 			)
 		)
 	end
-	@info padCount[]
 	return nWrites
 end
 

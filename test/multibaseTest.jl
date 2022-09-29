@@ -9,7 +9,7 @@ write(io, inputString)
 seek(io, 0)
 
 buf = read(io)
-but = rand(32321)
+buf = rand(UInt8, 32531)
 
 encodedString = MultiFormats.multiEncode(:base64, buf)
 
