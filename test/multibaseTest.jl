@@ -9,12 +9,14 @@ write(io, inputString)
 seek(io, 0)
 
 buf = read(io)
+but = rand(32321)
 
 encodedString = MultiFormats.multiEncode(:base64, buf)
 
 @testset "Encode and decode" begin
 	@test base64encode(buf) == multiEncode(:base64, buf)
-	@test base64encode(inputString) == multiEncode(:base64, inputString)
+	@test base64decode(encodedString) == multiDecode(:base64, encodedString |> collect .|> UInt8)
+	@test base64encode(buf) == multiEncode(:base64, buf)
 end
 
 # TODO check for large strings and bytes
