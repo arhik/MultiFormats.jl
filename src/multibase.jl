@@ -4,7 +4,10 @@ using Base64
 using Downloads
 
 # TODO artifact or a permanent location
-basetable = Downloads.download("https://raw.githubusercontent.com/multiformats/multibase/master/multibase.csv")
+basetable = Downloads.download(
+	"https://raw.githubusercontent.com/multiformats/multibase/master/multibase.csv"
+)
+
 
 multibaseTable = CSV.read(open(basetable), DataFrame, stripwhitespace=true)
 
@@ -70,12 +73,12 @@ for (idx, name) in enumerate(encodingNames)
 	quote 
 		struct $structName <: AbstractMultiBase
 		end
-
+		
 		getBaseName(a::$structName) = $name
 		getBaseName(a::Type{$structName}) = $name
 		getBaseName(a::Val{Symbol($mName)}) = $name
 		getBaseName(a::Val{$code}) = $name
-
+		
 		getBaseSymbol(a::$structName) = Symbol($mName)
 		getBaseSymbol(a::Type{$structName}) = Symbol($mName)
 		getBaseSymbol(a::Val{Symbol($mName)}) = a
@@ -88,7 +91,7 @@ for (idx, name) in enumerate(encodingNames)
 		getBaseCode(a::Type{$structName}) = $code
 		getBaseCode(a::Val{Symbol($mName)}) = getBaseCode(getBase(a))
 		getBaseCode(a::Val{$code}) = getBaseCode(getBase(a))
-			
+		
 		getBaseStatus(a::$structName) = $status
 		getBaseStatus(a::Type{$structName}) = $status
 		getBaseStatus(a::Val{Symbol($mName)}) = getBaseStatus(getBase(a))
@@ -98,12 +101,12 @@ for (idx, name) in enumerate(encodingNames)
 		getBaseDescription(a::Type{$structName}) = $description
 		getBaseDescription(a::Val{Symbol($mName)}) = getBaseDescription(getBase(a))
 		getBaseDescription(a::Val{$code}) = getBaseDescription(getBase(a))
-
+		
 		# TODO
 		Base.show(a::$structName) = begin
 			"Base : $structName $(getBaseStatus(a)), $(getBaseCode(a))"
 		end		
-
+		
 		# TODO
 		Base.display(a::$structName) = begin
 			"Base : $structName $(getBaseStatus(a)), $(getBaseCode(a))"
