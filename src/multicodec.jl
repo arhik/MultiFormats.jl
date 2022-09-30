@@ -3,7 +3,9 @@ using DataFrames
 using Downloads
 
 # TODO artifact or a permanent location
-table = Downloads.download("https://raw.githubusercontent.com/multiformats/multicodec/master/table.csv")
+table = Downloads.download(
+	"https://raw.githubusercontent.com/multiformats/multicodec/master/table.csv"
+)
 
 multicodecTable = CSV.read(open(table), DataFrame, stripwhitespace=true)
 
@@ -49,9 +51,12 @@ descriptions = select(multicodecTable, "description").description
 
 abstract type AbstractMultiCodec end
 
-for (idx, name) in enumerate(select(multicodecTable, "name").name)
-	sName = "Codec-"*name
-	structName = join(split(sName, "-") |> (x) -> map(uppercasefirst, x)) |> Symbol
+codecNameList = select(multicodecTable, "name").name .|> (x) -> replace(x, "-"=>"_")
+codecSymbolList = codecNameList .|> Symbol
+
+for (idx, name) in enumerate(codecNameList)
+	sName = "MultiCodec_"*name
+	structName = sName |> Symbol
 
 	description = descriptions[idx]
 	code = codecCodeList[idx]
@@ -126,21 +131,21 @@ codecDescription(name::Symbol) = getCodecDescription(Val(name))
 codecDescription(ud::Unsigned) = getCodecDescription(Val(id))
 
 # TODO
-function encode(::Type{CodecType}, bytes::Vector{UInt8}) where CodecType<:AbstractMultiCodec
+function wrap(::Type{CodecType}, bytes::Vector{UInt8}) where CodecType<:AbstractMultiCodec
 	pushfirst!(codecCode(CodecType), bytes)
 end
 
 # TODO
-function decode(::Type{CodecType}, bytes::Vector{UInt8}) where CodecType<:AbstractMultiCodec
+function unwrap(::Type{CodecType}, bytes::Vector{UInt8}) where CodecType<:AbstractMultiCodec
 	popfirst!(codecCode(CodecType), bytes)
 end
 
-function encode(symbol::Symbol, bytes::Vector{UInt8})
+function wrap(symbol::Symbol, bytes::Vector{UInt8})
 	code = reinterpret(UInt8, [codecCode(symbol)]) |> reverse
 	pushfirst!(bytes, code...)
 end
 
-function decode(symbol::Symbol, bytes::Vector{UInt8})
+function unwrap(symbol::Symbol, bytes::Vector{UInt8})
 	code = reinterpret(UInt8, [codecCode(symbol)]) |> reverse
 	@assert code == bytes[1:length(code)] "Given bytes doesnot match encoding $symbol"
 	for i in code
