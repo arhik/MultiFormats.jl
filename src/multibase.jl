@@ -255,7 +255,7 @@ end
 function multiEncode(enc::Val{:base64}, bytes::Union{String, Vector{UInt8}})
 	io = IOBuffer()
 	multiEncode(enc, io, pointer(bytes), length(bytes) |> UInt)
-	return String(take!(io))
+	return take!(io)
 end
 
 function multiDecode(enc::Val{:base64}, ioBuffer::IOBuffer, ptr::Ptr{UInt8}, n::UInt)::UInt
