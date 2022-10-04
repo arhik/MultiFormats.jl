@@ -21,7 +21,6 @@ quote
 end |> eval
 
 # Codec Tag
-
 codecTagList = select(multicodecTable, "tag").tag
 quote
 	@enum CodecTag $(
@@ -42,13 +41,11 @@ quote
 	)
 end |> eval
 
-
 # Codec Code
 codecCodeList = select(multicodecTable, "code").code .|> Meta.parse
 
 # Codec descriptions
 descriptions = select(multicodecTable, "description").description
-
 abstract type AbstractMultiCodec end
 
 codecNameList = select(multicodecTable, "name").name .|> (x) -> replace(x, "-"=>"_")
@@ -73,7 +70,6 @@ for (idx, name) in enumerate(codecNameList)
 		getCodecName(a::Type{$structName}) = $name
 		getCodecName(a::Val{Symbol($mName)}) = $name
 		getCodecName(a::Val{$code}) = $name
-		
 
 		getCodecSymbol(a::$structName) = Symbol($mName)
 		getCodecSymbol(a::Type{$structName}) = Symbol($mName)
@@ -156,5 +152,4 @@ function unwrap(symbol::Symbol, bytes::Vector{UInt8})
 end
 
 export codec, codecName, codecSymbol, codecCode, 
-	codecTag, codecStatus, codecDescription,
-	encode, decode
+	codecTag, codecStatus, codecDescription

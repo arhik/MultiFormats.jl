@@ -139,7 +139,6 @@ baseStatus(id::Union{Unsigned, Char}) = getBaseStatus(Val(id))
 baseDescription(name::Symbol) = getBaseDescription(Val(name))
 baseDescription(ud::Union{Unsigned, Char}) = getBaseDescription(Val(id))
 
-
 encodeString(a::Val{:base2}) = "01"
 encodeString(a::Val{:base8}) = "01234567"
 encodeString(a::Val{:base10}) = "0123456789"

@@ -1,11 +1,11 @@
 using SHA
-using MultiFormats
+
 export multiHash, hashWrap, hashUnwrap
 
-codecs = MultiFormats.codecSymbolList
+codecs = codecSymbolList
 
 for incodec in codecs
-	if codecTag(incodec) == MultiFormats.MULTIHASH
+	if codecTag(incodec) == MULTIHASH
 		if isdefined(SHA, incodec)
 			if incodec == :identity
 				continue
@@ -35,20 +35,20 @@ for incodec in codecs
 end
 
 function multiHash(a::Symbol, bytes::Vector{UInt8})
-	@assert codecTag(a) == MultiFormats.MULTIHASH
+	@assert codecTag(a) == MULTIHASH
 	cntxt = Base.getproperty(SHA, Symbol(uppercase(a |> string)*"_CTX"))()
 	multiHash(cntxt, bytes)
 end
 
 function hashWrap(a::Symbol, bytes::Vector{UInt8})
-	@assert codecTag(a) == MultiFormats.MULTIHASH
+	@assert codecTag(a) == MULTIHASH
 	cntxt = Base.getproperty(SHA, Symbol(uppercase(a|>string)*"_CTX"))()
 	len = length(cntxt) |> UInt |> UVarInt
 	pushfirst!(copy(bytes),  (codecCode(a) |> UVarInt)..., (len)...)
 end
 
 function hashUnwrap(a::Symbol, bytes::Vector{UInt8})
-	@assert codecTag(a) == MultiFormats.MULTIHASH
+	@assert codecTag(a) == MULTIHASH
 	code = codecCode(a) |> UInt |> UVarInt
 	cntxt = Base.getproperty(SHA, Symbol(uppercase(a |> string)*"_CTX"))()
 	len = length(cntxt) |> UInt |> UVarInt
@@ -56,4 +56,5 @@ function hashUnwrap(a::Symbol, bytes::Vector{UInt8})
 	@assert bytes[length(code)+1:length(code) + (len |> length)] == len
 	return bytes[(len|>length)+length(code)+1:end]
 end
+
 
