@@ -2,6 +2,9 @@ using CSV
 using DataFrames
 using Downloads
 
+export codec, codecName, codecSymbol, codecCode, 
+	codecTag, codecStatus, codecDescription
+
 # TODO artifact or a permanent location
 table = Downloads.download(
 	"https://raw.githubusercontent.com/multiformats/multicodec/master/table.csv"
@@ -151,5 +154,3 @@ function unwrap(symbol::Symbol, bytes::Vector{UInt8})
 	bytes
 end
 
-export codec, codecName, codecSymbol, codecCode, 
-	codecTag, codecStatus, codecDescription

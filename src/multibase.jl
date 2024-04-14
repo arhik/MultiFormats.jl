@@ -3,6 +3,11 @@ using DataFrames
 using Base64
 using Downloads
 
+export base, baseName, baseSymbol, baseCode, 
+	baseStatus, baseDescription,
+	multiEncode, multiDecode
+
+
 # TODO artifact or a permanent location
 basetable = Downloads.download(
 	"https://raw.githubusercontent.com/multiformats/multibase/master/multibase.csv"
@@ -41,7 +46,7 @@ end |> eval
 # TODO temporary 
 baseCodeList = begin 
 	codeUntyped = []
-	codes = select(multibaseTable, "code").code
+	codes = select(multibaseTable, "character").character
 	for (idx, code) in enumerate(codes)
 		push!(codeUntyped, (length(code) > 1 ? Meta.parse(code) : code[1]))
 	end
@@ -69,6 +74,8 @@ for (idx, name) in enumerate(encodingNames)
 	status = baseStatusList[idx] .|> uppercase .|> Symbol
 	
 	mName = replace(name, "-" => "_")
+	code == :NUL
+	continue
 
 	quote 
 		struct $structName <: AbstractMultiBase
@@ -217,7 +224,7 @@ end
 
 
 function multiEncode(enc::Val{:base64}, ioBuffer::IOBuffer, ptr::Ptr{UInt8}, n::UInt)::UInt
-	pad = '='
+	pad = "="
 	nWrites = 0
 	bufSize = 512
 	inSize = div(div(bufSize*3, 4, RoundUp), 3, RoundUp)*3 |> Int
@@ -258,7 +265,7 @@ function multiEncode(enc::Val{:base64}, bytes::Union{String, Vector{UInt8}})
 end
 
 function multiDecode(enc::Val{:base64}, ioBuffer::IOBuffer, ptr::Ptr{UInt8}, n::UInt)::UInt
-	pad = '=' |> UInt8
+	pad = transcode(UInt8, "=") |> first
 	nWrites = 0
 	bufSize = 512
 	inSize = div(div(bufSize*4, 3, RoundDown), 4, RoundDown)*4 |> Int
@@ -333,7 +340,4 @@ function multiUnwrap(symbol::Symbol, bytes::Vector{UInt8})
 end
 
 
-export base, baseName, baseSymbol, baseCode, 
-	baseStatus, baseDescription,
-	multiEncode, multiDecode
 
